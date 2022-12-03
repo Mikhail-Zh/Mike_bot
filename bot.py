@@ -10,37 +10,27 @@ updater = Updater(token=TG_TOKEN)
 dispatcher = updater.dispatcher
 
 start_receiving = 0
-choice = 1
-screen = 2
-current_kz = 3
-time_protection = 4
+screen = 1
+current_kz = 2
+time_protection = 3
 
 
 def start(update, context):
     """Начало работы с ботом."""
     context.bot.send_message(update.effective_chat.id, 'Привет! Я бот Mike.\n'
                                                        'Могу рассчитать сечение экрана кабеля по току\n'
-                                                       'или величину тока для сечения.')
-    context.bot.send_message(update.effective_chat.id, 'Для подробной справки напиши команду - /info')
-    beginning(update, context)
-    return choice
+                                                       'или величину тока для сечения экрана.')
+    context.bot.send_message(update.effective_chat.id, 'Для получения подробной информации, команда - /info')
 
 
-def beginning(update, context):
-    """Выводит фразу бота"""
-    context.bot.send_message(update.effective_chat.id, 'Для определения сечения экрана кабеля введите: 1')
-    context.bot.send_message(update.effective_chat.id, 'Для определения тока КЗ экрана кабеля введите: 2')
+def start_screen(update, context):
+    context.bot.send_message(update.effective_chat.id, 'Введите сечение экрана, мм2:')
+    return screen
 
 
-def choice_action(update, context):
-    """Выбор действия бота"""
-    match update.message.text:
-        case '1':
-            context.bot.send_message(update.effective_chat.id, 'Введите ток КЗ, А:')
-            return current_kz
-        case '2':
-            context.bot.send_message(update.effective_chat.id, 'Введите сечение экрана, мм2:')
-            return screen
+def start_current_kz(update, context):
+    context.bot.send_message(update.effective_chat.id, 'Введите ток КЗ, А:')
+    return current_kz
 
 
 def set_current_kz_screen(update, context):
@@ -51,17 +41,6 @@ def set_current_kz_screen(update, context):
         set_current_kz(value_tkz)
         context.bot.send_message(update.effective_chat.id, 'Время действия защиты, сек.:')
         return time_protection
-
-
-def verify(val, update, context):
-    """Верификация данных введенных пользователем."""
-    for char in val:
-        if char in '.,':
-            val = val.replace(char, '')
-    if not val.isdigit():
-        context.bot.send_message(update.effective_chat.id, 'Введено не верное значение')
-    else:
-        return True
 
 
 def set_section_screen(update, context):
@@ -85,16 +64,34 @@ def set_time_protect(update, context):
     if check is True:
         set_time(value_time)
         data = get_data()
-        calculation(data, update, context)
-        return choice
+        match calculation(data, update, context):
+            case 'screen':
+                context.bot.send_message(update.effective_chat.id, 'Введите сечение экрана, мм2:')
+                return screen
+            case 'current_kz':
+                context.bot.send_message(update.effective_chat.id, 'Введите ток КЗ, А:')
+                return current_kz
+
+
+def verify(val, update, context):
+    """Верификация данных введенных пользователем."""
+    for char in val:
+        if char in '.,':
+            val = val.replace(char, '')
+    if not val.isdigit():
+        context.bot.send_message(update.effective_chat.id, 'Введено не верное значение')
+    else:
+        return True
 
 
 def calculation(lst, update, context):
     """Выбор расчета"""
     if lst[0] is None:  # рассчитать экран
         calculation_screen([lst[1], lst[2]], update, context)
+        return 'current_kz'
     elif lst[1] is None:  # рассчитать ток термической стойкости
         calculation_current([lst[0], lst[2]], update, context)
+        return 'screen'
 
 
 def calculation_screen(lst, update, context):
@@ -112,8 +109,7 @@ def calculation_screen(lst, update, context):
         context.bot.send_message(update.effective_chat.id, f'Сечение экрана из алюминиевого сплава '
                                                            f'{screen_cable_list[1]} мм2')
     set_current_kz(None)
-    context.bot.send_message(update.effective_chat.id, f'>> начнем с начала <<')
-    beginning(update, context)
+    set_time(None)
 
 
 def calculation_current(lst, update, context):
@@ -135,8 +131,6 @@ def calculation_current(lst, update, context):
         context.bot.send_message(update.effective_chat.id, f'для экрана из алюминиевого сплава {result_al} А')
     set_section(None)
     set_time(None)
-    context.bot.send_message(update.effective_chat.id, f'>> начнем с начала <<')
-    beginning(update, context)
 
 
 def cancel(update, context):
@@ -154,7 +148,8 @@ def get_db(update, context):
 
 
 start_handler = CommandHandler('start', start)
-choice_action_handler = MessageHandler(Filters.text & (~Filters.command), choice_action)
+start_screen_handler = CommandHandler('scr', start_screen)
+start_current_kz_handler = CommandHandler('tkz', start_current_kz)
 set_current_kz_screen_handler = MessageHandler(Filters.text & (~Filters.command), set_current_kz_screen)
 set_section_screen_handler = MessageHandler(Filters.text & (~Filters.command), set_section_screen)
 set_time_protect_handler = MessageHandler(Filters.text & (~Filters.command), set_time_protect)
@@ -162,14 +157,19 @@ mes_data_handler = CommandHandler('end', cancel)
 info_handler = CommandHandler('info', help_info)
 get_db_handler = CommandHandler('all', get_db)
 
-conv_handler = ConversationHandler(entry_points=[start_handler],
-                                   states={choice: [choice_action_handler],
-                                           current_kz: [set_current_kz_screen_handler],
-                                           screen: [set_section_screen_handler],
-                                           time_protection: [set_time_protect_handler]},
-                                   fallbacks=[mes_data_handler])
+conv_handler_screen = ConversationHandler(entry_points=[start_screen_handler],
+                                          states={screen: [set_section_screen_handler],
+                                                  time_protection: [set_time_protect_handler]},
+                                          fallbacks=[mes_data_handler])
 
-dispatcher.add_handler(conv_handler)
+conv_handler_current_kz = ConversationHandler(entry_points=[start_current_kz_handler],
+                                              states={current_kz: [set_current_kz_screen_handler],
+                                                      time_protection: [set_time_protect_handler]},
+                                              fallbacks=[mes_data_handler])
+
+dispatcher.add_handler(start_handler)
+dispatcher.add_handler(conv_handler_screen)
+dispatcher.add_handler(conv_handler_current_kz)
 dispatcher.add_handler(info_handler)
 dispatcher.add_handler(get_db_handler)
 

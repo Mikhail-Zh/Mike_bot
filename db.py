@@ -16,7 +16,7 @@ def calc_screen(values_list):
     for i in [cu, al]:
         for key, val in i.items():
             val = (val / float(time) ** 0.5)
-            if float(current) > max(i.values()):
+            if float(current) > (max(i.values()) / (float(time) ** 0.5)):
                 screen_list.append(None)
                 break
             if float(current) <= val:
