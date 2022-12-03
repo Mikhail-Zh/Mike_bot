@@ -86,7 +86,7 @@ def set_time_protect(update, context):
         set_time(value_time)
         data = get_data()
         calculation(data, update, context)
-    return choice
+        return choice
 
 
 def calculation(lst, update, context):

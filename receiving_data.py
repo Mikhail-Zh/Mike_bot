@@ -26,17 +26,6 @@ def get_data():
     return [section_screen, current_kz, time_protect]
 
 
-def verify(val):
-    """Верификация данных введенных пользователем."""
-    for char in val:
-        if char in '.,':
-            val = val.replace(char, '')
-    if not val.isdigit():
-        return 'Введено не верное значение'
-    else:
-        return True
-
-
 def refactor(elem):
     """Заменяет запятую на точку"""
     if elem is None:
